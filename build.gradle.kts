@@ -1,3 +1,4 @@
+import org.quiltmc.installer.gradle.BashBootstrapTask
 import java.net.URI
 
 plugins {
@@ -18,7 +19,7 @@ version = if (env["SNAPSHOTS_URL"] != null) {
 } else {
 	"0.9.1"
 }
-base.archivesBaseName = project.name
+base.archivesName.set(project.name)
 
 repositories {
 	mavenCentral()
@@ -88,8 +89,16 @@ tasks.shadowJar {
 	from(sourceSets["java8"].output)
 }
 
+val bashBootstrap = tasks.register("bashBootstrap", BashBootstrapTask::class) {
+	dependsOn(tasks.shadowJar)
+	mustRunAfter(tasks.jar)
+	installerJar.set(tasks.shadowJar.get().archiveFile)
+	outputFile.set(project.file("build/libs/quilt-installer-${project.version}-bootstrap.sh"))
+}
+
 tasks.build {
 	dependsOn(tasks.shadowJar)
+	dependsOn(bashBootstrap)
 }
 
 val copyForNative = tasks.register<Copy>("copyForNative") {
@@ -113,6 +122,7 @@ publishing {
 		if (env["TARGET"] == null) {
 			create<MavenPublication>("mavenJava") {
 				from(components["java"])
+				artifact(bashBootstrap)
 			}
 		} else {
 			// TODO: When we build macOS make this work
